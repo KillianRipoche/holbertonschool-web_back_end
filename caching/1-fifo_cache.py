@@ -5,6 +5,7 @@ FIFOCache module
 
 BaseCaching = __import__('base_caching').BaseCaching
 
+
 class FIFOCache(BaseCaching):
     """
     FIFOCache is a caching system that uses the FIFO algo
@@ -51,6 +52,3 @@ class FIFOCache(BaseCaching):
         if key is None:
             return None
         return self.cache_data.get(key)
-
-
-
