@@ -3,6 +3,9 @@
 import re
 from typing import List
 import logging
+import os
+import mysql.connector
+from mysql.connector.connection import MySQLConnection
 
 
 # Constante PII_FIELDS : les 5 champs les plus sensibles
@@ -73,3 +76,25 @@ def get_logger() -> logging.Logger:
     handler.setFormatter(RedactingFormatter(fields=PII_FIELDS))
     logger.addHandler(handler)
     return logger
+
+
+def get_db() -> MySQLConnection:
+    """
+    Connects to a secure MySQL database using environment variables.
+
+    Returns:
+        A MySQLConnection object connected to the database
+    """
+    username = os.getenv("PERSONAL_DATA_DB_USERNAME", "root")
+    password = os.getenv("PERSONAL_DATA_DB_PASSWORD", "")
+    host = os.getenv("PERSONAL_DATA_DB_HOST", "localhost")
+    database = os.getenv("PERSONAL_DATA_DB_NAME")
+
+    connection = mysql.connector.connect(
+        user=username,
+        password=password,
+        host=host,
+        database=database
+    )
+
+    return connection
