@@ -3,6 +3,8 @@
 BasicAuth module for API authentication
 """
 from api.v1.auth.auth import Auth
+from models.user import User
+from typing import TypeVar
 import base64
 
 
@@ -14,11 +16,12 @@ class BasicAuth(Auth):
     def extract_base64_authorization_header(self,
                                             authorization_header: str) -> str:
         """
-        Extracts the Base64 part
+        Extracts the Base64 part of the Authorization header
+        for Basic Authentication
         Args:
             authorization_header: the Authorization header string
         Returns:
-            The Base64 part after 'Basic '
+            The Base64 part after 'Basic ', or None if invalid
         """
         if authorization_header is None:
             return None
@@ -74,3 +77,35 @@ class BasicAuth(Auth):
 
         credentials = decoded_base64_authorization_header.split(':', 1)
         return credentials[0], credentials[1]
+
+    def user_object_from_credentials(self,
+                                     user_email: str,
+                                     user_pwd: str) -> TypeVar('User'):
+        """
+        Returns the User instance based on email and password
+        Args:
+            user_email: user's email
+            user_pwd: user's password
+        Returns:
+            User instance if credentials are valid, None otherwise
+        """
+        if user_email is None or not isinstance(user_email, str):
+            return None
+
+        if user_pwd is None or not isinstance(user_pwd, str):
+            return None
+
+        try:
+            users = User.search({"email": user_email})
+        except Exception:
+            return None
+
+        if not users or len(users) == 0:
+            return None
+
+        user = users[0]
+
+        if not user.is_valid_password(user_pwd):
+            return None
+
+        return user
