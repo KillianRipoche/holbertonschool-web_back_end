@@ -26,10 +26,8 @@ class Auth:
         if excluded_paths is None or len(excluded_paths) == 0:
             return True
 
-        # Normalize path to end with / (slash tolerant)
         normalized_path = path if path.endswith('/') else path + '/'
 
-        # Check if normalized path is in excluded_paths
         if normalized_path in excluded_paths:
             return False
 
@@ -41,9 +39,13 @@ class Auth:
         Args:
             request: Flask request object
         Returns:
-            None for now (will be implemented later)
+            None if request is None or Authorization header is missing,
+            otherwise returns the value of Authorization header
         """
-        return None
+        if request is None:
+            return None
+
+        return request.headers.get('Authorization')
 
     def current_user(self, request=None) -> TypeVar('User'):
         """
