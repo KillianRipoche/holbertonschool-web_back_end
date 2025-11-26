@@ -1,101 +1,71 @@
 #!/usr/bin/env python3
-"""Auth module
+"""DB module
 """
-import bcrypt
-import uuid
-from db import DB
-from user import User
+from sqlalchemy import create_engine
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm.session import Session
+from sqlalchemy.exc import InvalidRequestError
 from sqlalchemy.orm.exc import NoResultFound
 
-
-def _hash_password(password: str) -> bytes:
-    """Hash a password with bcrypt
-
-    Args:
-        password: The password string to hash
-
-    Returns:
-        bytes: The salted hash of the password
-    """
-    salt = bcrypt.gensalt()
-    hashed = bcrypt.hashpw(password.encode('utf-8'), salt)
-    return hashed
+from user import Base, User
 
 
-def _generate_uuid() -> str:
-    """Generate a new UUID
-
-    Returns:
-        str: String representation of a new UUID
-    """
-    return str(uuid.uuid4())
-
-
-class Auth:
-    """Auth class to interact with the authentication database.
+class DB:
+    """DB class
     """
 
-    def __init__(self):
-        self._db = DB()
+    def __init__(self) -> None:
+        """Initialize a new DB instance
+        """
+        self._engine = create_engine("sqlite:///a.db")
+        Base.metadata.drop_all(self._engine)
+        Base.metadata.create_all(self._engine)
+        self.__session = None
 
-    def register_user(self, email: str, password: str) -> User:
-        """Register a new user
+    @property
+    def _session(self) -> Session:
+        """Memoized session object
+        """
+        if self.__session is None:
+            DBSession = sessionmaker(bind=self._engine)
+            self.__session = DBSession()
+        return self.__session
 
-        Args:
-            email: User's email address
-            password: User's password in plain text
+    def add_user(self, email: str, hashed_password: str) -> User:
+        """Save the user to the database
+        """
+        user = User(email=email, hashed_password=hashed_password)
+        self._session.add(user)
+        self._session.commit()
 
-        Returns:
-            User: The newly created User object
+        return user
 
-        Raises:
-            ValueError: If a user with this email already exists
+    def find_user_by(self, **kwargs) -> User:
+        """Returns the first row found in the users table
+        as filtered by the methods input arguments."""
+        try:
+            user = self._session.query(User).filter_by(**kwargs).one()
+            return user
+
+        except NoResultFound:
+            raise NoResultFound
+        except InvalidRequestError:
+            raise InvalidRequestError
+
+    def update_user(self, user_id: int, **kwargs) -> None:
+        """Return None
         """
         try:
-            # Check if user already exists
-            self._db.find_user_by(email=email)
-            # If we reach here, user exists
-            raise ValueError(f"User {email} already exists")
+            user = self.find_user_by(id=user_id)
         except NoResultFound:
-            # User doesn't exist, we can create it
-            hashed_password = _hash_password(password)
-            new_user = self._db.add_user(
-                email, hashed_password.decode('utf-8'))
-            return new_user
+            raise NoResultFound
 
-    def valid_login(self, email: str, password: str) -> bool:
-        """Validate user login credentials
+        for key, value in kwargs.items():
+            user_att = hasattr(user, key)
 
-        Args:
-            email: User's email address
-            password: User's password in plain text
+            if not user_att:
+                raise ValueError
+            setattr(user, key, value)
 
-        Returns:
-            bool: True if credentials are valid, False otherwise
-        """
-        try:
-            user = self._db.find_user_by(email=email)
-            # Check if password matches
-            return bcrypt.checkpw(
-                password.encode('utf-8'),
-                user.hashed_password.encode('utf-8')
-            )
-        except NoResultFound:
-            return False
-
-    def create_session(self, email: str) -> str:
-        """Create a session for a user
-
-        Args:
-            email: User's email address
-
-        Returns:
-            str: The session ID, or None if user not found
-        """
-        try:
-            user = self._db.find_user_by(email=email)
-            session_id = _generate_uuid()
-            self._db.update_user(user.id, session_id=session_id)
-            return session_id
-        except NoResultFound:
-            return None
+        self._session.commit()
